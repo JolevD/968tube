@@ -2,8 +2,17 @@
 // import dotenv from "dotenv"
 // dotenv.config({ path: "./env" })
 // node -v + has script syntax to preload dotenv , which we are using. ref: pakage.json -> script
+import app from "./app.js";
 import connectDB from "./db/index.js";
 connectDB()
+    .then(() => {
+        app.listen(process.env.PORT || 8000, () => {
+            console.log(`app is running on port: ${process.env.PORT}`)
+        })
+    })
+    .catch((err) => {
+        console.log(err.message, "ERROR CONNECTING TO THE DB!!!!!!!")
+    })
 
 
 
