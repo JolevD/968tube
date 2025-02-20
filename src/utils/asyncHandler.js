@@ -3,7 +3,7 @@
 // this is one method which is also used in industries but we will be not using this in this project 
 
 const asyncHandler = (requestHandler) => {
-    (req, res, next) => {
+    return (req, res, next) => {
         Promise.resolve(requestHandler(req, res, next)).catch(err => next(err.message))
 
     }
