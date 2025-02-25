@@ -1,3 +1,4 @@
+import { array } from "zod"
 import { User } from "../models/user.model.js"
 import { ApiError } from "../utils/apiError.js"
 import { apiResponse } from "../utils/apiResponse.js"
@@ -11,7 +12,7 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields required")
     }
 
-    const existingUser = User.findOne({
+    const existingUser = await User.findOne({
         $or: [{ username }, { email }]  // $or is a mongoDB operator which can check for both conditions at the same time here
     })
 
@@ -21,7 +22,15 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const avatarLocalPath = req.files?.avatar[0]?.path // here req comes from the multer middleware which adds the files fields so we have to check if the file or spcifically the local avatar file path is available or not. same for the coverimage 
 
-    const coverImageLocalPath = req.files?.coverImage[0]?.path  // revise the index property here
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path  // revise the index property here
+    // above line has a problem -> as coverimage is not required while creating the user we should have to define the path in a different way so that the path becomes empty if  user doesnot sends the coverimage 
+
+    let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+        coverImageLocalPath = req.files.coverImage[0].path
+    }
+
+
 
     if (!avatarLocalPath) {
         throw new ApiError(400, "avatar is required")
