@@ -1,4 +1,3 @@
-import { array } from "zod"
 import { User } from "../models/user.model.js"
 import { ApiError } from "../utils/apiError.js"
 import { apiResponse } from "../utils/apiResponse.js"
@@ -8,7 +7,7 @@ import { uploadFilesOnCloudinary } from "../utils/cloudinary.js"
 const registerUser = asyncHandler(async (req, res) => {
     const { username, password, email, fullname } = req.body
 
-    if ([username, password, email, fullname].some((field) => field?.trim() === "")) {  // revise .some method 
+    if ([username, password, email, fullname].some((field) => !field || field?.trim() === "")) {  // revise .some method 
         throw new ApiError(400, "All fields required")
     }
 
@@ -20,15 +19,15 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(409, "user already exists")
     }
 
-    const avatarLocalPath = req.files?.avatar[0]?.path // here req comes from the multer middleware which adds the files fields so we have to check if the file or spcifically the local avatar file path is available or not. same for the coverimage 
+    const avatarLocalPath = req.files.avatar?.[0]?.path // here req comes from the multer middleware which adds the files fields so we have to check if the file or spcifically the local avatar file path is available or not. same for the coverimage 
 
-    // const coverImageLocalPath = req.files?.coverImage[0]?.path  // revise the index property here
+    const coverImageLocalPath = req.files.coverImage?.[0]?.path  // revise the index property here
     // above line has a problem -> as coverimage is not required while creating the user we should have to define the path in a different way so that the path becomes empty if  user doesnot sends the coverimage 
 
-    let coverImageLocalPath;
-    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
-        coverImageLocalPath = req.files.coverImage[0].path
-    }
+    // let coverImageLocalPath;
+    // if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+    //     coverImageLocalPath = req.files.coverImage[0].path
+    // }
 
 
 
