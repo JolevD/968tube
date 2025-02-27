@@ -4,6 +4,28 @@ import { apiResponse } from "../utils/apiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { uploadFilesOnCloudinary } from "../utils/cloudinary.js"
 
+
+const generateAccessTokenAndRefreshToken = async (userId) => {
+
+    try {
+        const user = User.findById(userId)
+        const accessToken = await user.generateAccessToken()
+        const refreshToken = await user.generateRefreshToken()
+
+        user.refreshToken = refreshToken
+        user.save({ validateBeforeSave: false })
+
+        return { accessToken, refreshToken }
+
+    } catch (error) {
+        console.log(error)
+        throw new ApiError(500, "error while creating tokens")
+    }
+
+
+}
+
+
 const registerUser = asyncHandler(async (req, res) => {
     const { username, password, email, fullname } = req.body
 
@@ -64,4 +86,54 @@ const registerUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser }
+
+const loginUser = asyncHandler(async (req, res) => {
+    const { username, email, password } = req.body
+
+    // check for user in db
+    const user = User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!user) {
+        throw new ApiError(404, "User does not exists")
+    }
+
+    // check for  password
+    const isPasswordCorrect = await user.isPasswordCorrect(password)
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(401, "invalid password or username")
+    }
+
+    // if valid user generate tokens
+    const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id)
+
+    //update user 
+    const loggedUser = await User.findById(user._id).select("-password -refreshToken")
+
+    console.log(loggedUser);
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    res.status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new apiResponse(200, {
+                loggedUser, accessToken, refreshToken
+            },
+                "User logged in successfully")
+        )
+
+
+})
+
+const logoutUser = asyncHandler(async (req, res) => {
+
+})
+
+export { registerUser, loginUser }
