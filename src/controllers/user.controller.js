@@ -3,28 +3,25 @@ import { ApiError } from "../utils/apiError.js"
 import { apiResponse } from "../utils/apiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { uploadFilesOnCloudinary } from "../utils/cloudinary.js"
+import jwt from "jsonwebtoken"
 
-
-const generateAccessTokenAndRefreshToken = async (userId) => {
+const generateAccessAndRefereshTokens = async (userId) => {
 
     try {
-        const user = User.findById(userId)
-        const accessToken = await user.generateAccessToken()
-        const refreshToken = await user.generateRefreshToken()
+        const user = await User.findById(userId)
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()
 
         user.refreshToken = refreshToken
-        user.save({ validateBeforeSave: false })
+        await user.save({ validateBeforeSave: false })
 
         return { accessToken, refreshToken }
 
+
     } catch (error) {
-        console.log(error)
-        throw new ApiError(500, "error while creating tokens")
+        throw new ApiError(500, error.message)
     }
-
-
 }
-
 
 const registerUser = asyncHandler(async (req, res) => {
     const { username, password, email, fullname } = req.body
@@ -90,8 +87,11 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
     const { username, email, password } = req.body
 
+    if (!(username || email)) {
+        throw new ApiError(400, "Incorrect username or email")
+    }
     // check for user in db
-    const user = User.findOne({
+    const user = await User.findOne({
         $or: [{ username }, { email }]
     })
 
@@ -100,14 +100,14 @@ const loginUser = asyncHandler(async (req, res) => {
     }
 
     // check for  password
-    const isPasswordCorrect = await user.isPasswordCorrect(password)
+    const isPasswordValid = await user.isPasswordCorrect(password)
 
-    if (!isPasswordCorrect) {
+    if (!isPasswordValid) {
         throw new ApiError(401, "invalid password or username")
     }
 
     // if valid user generate tokens
-    const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id)
+    const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
 
     //update user 
     const loggedUser = await User.findById(user._id).select("-password -refreshToken")
@@ -155,6 +155,56 @@ const logoutUser = asyncHandler(async (req, res) => {
         .json(
             new apiResponse(200, {}, "User logged out")
         )
+
+})
+
+const regenAccessToken = asyncHandler(async (req, res) => {
+    // first we will get the refresh token stored on the client side
+    const clientRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+    if (!clientRefreshToken) {
+        throw new ApiError(400, "unauthorized request")
+    }
+
+    // then we will decode the token -> this means to verify that the client refresh token was created by our token key or not  
+
+    try {
+        const decodeToken = jwt.verify(clientRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+
+        // now we find the client in the DB
+
+        const user = await User.findById(decodeToken?._id)
+
+        if (!user) {
+            throw new ApiError(401, "invalid refresh token")
+        }
+
+        // after client is verified now we check the refresh token saved in the DB wrt to client
+        if (clientRefreshToken !== user?.refreshToken) {
+            throw new ApiError(401, "refresh token is expired or invalid")
+        }
+
+        // now we will generate new token for the new session
+
+        const { newAccessToken, newRefreshToken } = await generateAccessAndRefereshTokens(user._id)
+
+        // now we set these up for new session
+
+        const options = {
+            httpOnly: true,
+            secure: true
+        }
+
+        return res.status(200)
+            .cookie("accessToken", newAccessToken, options)
+            .cookie("refreshToken", newRefreshToken, options)
+            .json(
+                new apiResponse(200, { newAccessToken, newRefreshToken }, "new session started")
+            )
+    } catch (error) {
+        throw new ApiError(401, error.message)
+    }
+
 
 })
 
