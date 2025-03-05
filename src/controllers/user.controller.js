@@ -228,7 +228,17 @@ const resetPassword = asyncHandler(async (req, res) => {
         )
 })
 
-const accountDetailsUpdate = asyncHandler(async (req, res) => {
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            req.user,
+            "User fetched successfully"
+        ))
+})
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
     const { fullname, email } = req.body
 
     if (!(email || fullname)) {
@@ -434,8 +444,10 @@ export {
     logoutUser,
     regenAccessToken,
     resetPassword,
-    accountDetailsUpdate,
+    getCurrentUser,
+    updateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
-    userChannetProfile
+    userChannetProfile,
+    userWatchHistory
 }
