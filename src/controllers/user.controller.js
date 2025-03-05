@@ -304,6 +304,77 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 })
 
+const userChannetProfile = asyncHandler(async (req, res) => {
+    // we take username from the parameters
+    const { username } = req.params
+
+    if (!username) {
+        throw new ApiError(401, "User is missing")
+    }
+    const channelProfile = await User.aggregate([
+        {
+            $match: {
+                username: username?.toLowerCase()
+            } // this is to pick out specific user
+        },
+        {
+            $lookup: {
+                from: "subscriptions",  // the name how it is saved in mongo db
+                localField: "_id",  // field from the current model on which we are using aggregation and which is cimmected to the subscription model
+                foreignField: "channel", // same as how it is defined in the model
+                as: "subscribers"
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",  // the name how it is saved in mongo db
+                localField: "_id",  // field from the current model on which we are using aggregation and which is cimmected to the subscription model
+                foreignField: "subscriber", // same as how it is defined in the model
+                as: "subscribedTO"
+            }
+        },
+        {
+            $addFields: {
+                subscriberCount: {
+                    $size: "$subscribers" // $ sign because we have defined them as fields above
+                },
+                channelSubscribedToCount: {
+                    $size: "$subscribedTO"
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] }, // this is for the user's channel sub detail, like if the visiting user is subed to the user's channel or not in true or false form
+                        then: true,
+                        else: false
+                    }
+                }
+
+            }
+        },
+
+        {
+            $project: {
+                fullname: 1,
+                username: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1,
+                subscriberCount: 1,
+                channelSubscribedToCount: 1,
+                isSubscribed: 1
+            } // this is for what info is to send after database operations
+        }
+
+    ])
+
+    if (!channelProfile.length) {
+        throw new ApiError(404, "channel does not exist")
+    }
+
+    res.status(200).
+        json(new apiResponse(200, channelProfile[0], `${username} profile data fetched successfully`))
+})
+
 export {
     registerUser,
     loginUser,
@@ -312,5 +383,6 @@ export {
     resetPassword,
     accountDetailsUpdate,
     updateUserAvatar,
-    updateUserCoverImage
+    updateUserCoverImage,
+    userChannetProfile
 }
