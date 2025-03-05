@@ -1,3 +1,4 @@
+import mongoose from "mongoose"
 import { User } from "../models/user.model.js"
 import { ApiError } from "../utils/apiError.js"
 import { apiResponse } from "../utils/apiResponse.js"
@@ -319,8 +320,8 @@ const userChannetProfile = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "subscriptions",  // the name how it is saved in mongo db
-                localField: "_id",  // field from the current model on which we are using aggregation and which is cimmected to the subscription model
+                from: "subscriptions",  // the name of the model which is to be joined and how it is saved in mongo db
+                localField: "_id",  // field from the current model on which we are using aggregation and which is connected to the subscription model
                 foreignField: "channel", // same as how it is defined in the model
                 as: "subscribers"
             }
@@ -328,7 +329,7 @@ const userChannetProfile = asyncHandler(async (req, res) => {
         {
             $lookup: {
                 from: "subscriptions",  // the name how it is saved in mongo db
-                localField: "_id",  // field from the current model on which we are using aggregation and which is cimmected to the subscription model
+                localField: "_id",  // field from the current model on which we are using aggregation and which is connected to the subscription model
                 foreignField: "subscriber", // same as how it is defined in the model
                 as: "subscribedTO"
             }
@@ -374,6 +375,58 @@ const userChannetProfile = asyncHandler(async (req, res) => {
     res.status(200).
         json(new apiResponse(200, channelProfile[0], `${username} profile data fetched successfully`))
 })
+
+
+const userWatchHistory = asyncHandler(async (req, res) => {
+    // we already have the user in req via auth middleware
+
+    // ok so forst we will join the logged user and the videos (watch history) models together and as the videos model should also contain the ref to the video creator, due to this we will join the video and the creator user model in the subpipeline 
+
+    // aggregation always return an array i e userHistory is an array
+    const userHistory = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id) // req.user._id is a string and it need to pass through mongoose to become the required object id
+            }
+        },
+        {
+            $lookup: {
+                from: "videos", // the name of the model which is to be joined and how it is saved in mongo db
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "user",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        username: 1,
+                                        avatar: 1
+                                    } // the owner field now has 2 values 
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields: {
+                            $first: "$owner"
+                        } // this just helps to return first object of the owner field rather then returning the owner field as an array, means now the owner field is an object. this is for easibility for the frontend
+                    }
+                ]
+            }
+        }
+    ])
+
+    res.status(200)
+        .json(new apiResponse(200, userHistory[0].watchHistory, "watch history retreved successfully"))
+})
+
+
 
 export {
     registerUser,
