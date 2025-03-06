@@ -113,7 +113,7 @@ const loginUser = asyncHandler(async (req, res) => {
     //update user 
     const loggedUser = await User.findById(user._id).select("-password -refreshToken")
 
-    console.log(loggedUser);
+    // console.log(loggedUser);
 
     const options = {
         httpOnly: true,
@@ -231,7 +231,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res
         .status(200)
-        .json(new ApiResponse(
+        .json(new apiResponse(
             200,
             req.user,
             "User fetched successfully"
@@ -378,6 +378,8 @@ const userChannetProfile = asyncHandler(async (req, res) => {
 
     ])
 
+
+
     if (!channelProfile.length) {
         throw new ApiError(404, "channel does not exist")
     }
@@ -424,13 +426,19 @@ const userWatchHistory = asyncHandler(async (req, res) => {
                     },
                     {
                         $addFields: {
-                            $first: "$owner"
+                            firstOwner: { $first: "$owner" }
                         } // this just helps to return first object of the owner field rather then returning the owner field as an array, means now the owner field is an object. this is for easibility for the frontend
                     }
                 ]
             }
         }
     ])
+
+
+
+    if (!userHistory.length) {
+        throw new ApiError(404, "user not found ")
+    }
 
     res.status(200)
         .json(new apiResponse(200, userHistory[0].watchHistory, "watch history retreved successfully"))
